@@ -36,7 +36,7 @@ resource "azurerm_resource_group" "rg_sebastian" {
 
 > 💡 *Aquí estamos creando el grupo de recursos en la región seleccionada (westus)*.
 
-![alt text](image.png)
+![alt text](img/image.png)
 
 ---
 
@@ -70,7 +70,7 @@ resource "azurerm_subnet" "subnet_vnet_sebastian" {
 
 > 💡 *Se crea una subnet dentro de la red virtual con un prefijo de direcciones IP específico*.
 
-![alt text](image-2.png)
+![alt text](img/image-2.png)
 
 ---
 
@@ -87,7 +87,7 @@ resource "azurerm_public_ip" "public_ip_first_vm" {
 
 > 💡 *Esta IP será utilizada para conectarse a la VM desde Internet*.
 
-![alt text](image-1.png)
+![alt text](img/image-1.png)
 
 ---
 
@@ -103,7 +103,7 @@ resource "azurerm_network_security_group" "nsg_sebastian_first" {
 
 > 💡 *Define reglas para permitir el tráfico SSH y el acceso a Internet*.
 
-![alt text](image-3.png)
+![alt text](img/image-3.png)
 ---
 
 #### **7. Interfaz de Red (📡 azurerm_network_interface)**
@@ -123,7 +123,7 @@ resource "azurerm_network_interface" "nic_sebastian_first" {
 
 > 💡 *Aquí conectamos la VM a la red y asociamos su IP pública*.
 
-![alt text](image-4.png)
+![alt text](img/image-4.png)
 
 ---
 
@@ -141,7 +141,7 @@ resource "azurerm_linux_virtual_machine" "vm_sebastian_first" {
 
 > 💡 *La VM incluye Ubuntu 18.04, y se permite la autenticación con contraseña*.
 
-![alt text](image-5.png)
+![alt text](img/image-5.png)
 
 ---
 
