@@ -1,9 +1,3 @@
-# Output for the public IP
-output "public_ip" {
-  description = "The public IP of the virtual machine."
-  value       = azurerm_public_ip.public_ip_first_vm.ip_address
-}
-
 # Output for the Virtual Network name
 output "vnet_name" {
   description = "The name of the virtual network."
@@ -19,5 +13,11 @@ output "subnet_name" {
 # Output for the Virtual Machine ID
 output "vm_id" {
   description = "The ID of the virtual machine."
-  value       = azurerm_linux_virtual_machine.vm_sebastian_first.id
+  value       = module.vm.vm_id
+}
+
+# Output for the public IP
+output "public_ip" {
+  description = "The public IP of the virtual machine."
+  value       = module.vm.public_ip
 }
