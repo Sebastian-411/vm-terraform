@@ -1,17 +1,18 @@
-# **🌍 Informe de Despliegue con Terraform 🚀**
+# **🌍 Informe de Despliegue Modular con Terraform 🚀**
 
 ---
 
 ### **Introducción**
 
-Este informe detalla el proceso de despliegue realizado en Azure utilizando **Terraform**. El objetivo es crear una infraestructura que incluye una red virtual, una subred, una máquina virtual Linux, y varios recursos asociados, todo desplegado automáticamente.
+Este informe detalla el proceso de despliegue realizado en Azure utilizando **Terraform** con un enfoque modular. El objetivo es crear una infraestructura que incluye una red virtual, una subred, una máquina virtual Linux, y varios recursos asociados, todo desplegado automáticamente y organizado en módulos para facilitar la reutilización y el mantenimiento.
 
 ---
 
-### **Componentes del Despliegue**
+### **Componentes del Despliegue Modular**
 
 #### **1. Proveedor de Azure (🔧 provider "azurerm")**
-Este bloque define el proveedor de Azure que nos permite interactuar con los recursos de Azure mediante Terraform.
+
+El proveedor de Azure permite interactuar con los recursos de Azure mediante Terraform. Se ha configurado el proveedor utilizando la suscripción de Azure definida en las variables.
 
 ```hcl
 provider "azurerm" {
@@ -19,13 +20,13 @@ provider "azurerm" {
   features {}
 }
 ```
-> 💡 *Este proveedor utiliza la suscripción de Azure configurada mediante variables*.
+> 💡 *Este bloque asegura que Terraform pueda gestionar recursos en Azure mediante la suscripción correspondiente*.
 
 ---
 
 #### **2. Grupo de Recursos (📦 azurerm_resource_group)**
 
-El grupo de recursos es el contenedor donde se agrupan todos los recursos de Azure.
+El grupo de recursos es el contenedor donde se agrupan todos los recursos de Azure. Se despliega fuera de los módulos para ser reutilizado por otros recursos.
 
 ```hcl
 resource "azurerm_resource_group" "rg_sebastian" {
@@ -33,141 +34,129 @@ resource "azurerm_resource_group" "rg_sebastian" {
   location = var.location
 }
 ```
-
-> 💡 *Aquí estamos creando el grupo de recursos en la región seleccionada (westus)*.
-
-![alt text](img/image.png)
+> 💡 *Agrupa todos los recursos en una ubicación específica*.
 
 ---
 
-#### **3. Red Virtual (🌐 azurerm_virtual_network)**
+#### **3. Red Virtual y Subnet (🌐 azurerm_virtual_network y azurerm_subnet)**
 
-La red virtual es el entorno de red en el que se despliegan todos los recursos.
+La red virtual y la subred se configuran de manera modular. Esto permite definir la infraestructura de red y dividirla en segmentos más pequeños.
 
 ```hcl
-resource "azurerm_virtual_network" "vnet_sebastian" {
-  name          = var.vnet_name
-  address_space = [var.vnet_address_space]
-  location      = azurerm_resource_group.rg_sebastian.location
+module "network" {
+  source              = "./modules/network"
+  location            = azurerm_resource_group.rg_sebastian.location
+  resource_group_name = azurerm_resource_group.rg_sebastian.name
 }
 ```
 
-> 💡 *Define el espacio de direcciones IP utilizado por los recursos de la red*.
-
+> 💡 *La red virtual y la subred se declaran dentro del módulo para mantener la infraestructura organizada y reutilizable*.
 
 ---
 
-#### **4. Subnet (🔌 azurerm_subnet)**
+#### **4. Módulo de Máquina Virtual (💻 módulo "vm")**
 
-Las subnets son divisiones dentro de la red virtual.
+El módulo de la máquina virtual despliega una VM con **Ubuntu** como sistema operativo, gestionando la IP pública, la interfaz de red, y las reglas de seguridad.
 
 ```hcl
-resource "azurerm_subnet" "subnet_vnet_sebastian" {
+module "vm" {
+  source              = "./modules/vm"
+  location            = azurerm_resource_group.rg_sebastian.location
+  resource_group_name = azurerm_resource_group.rg_sebastian.name
+  subnet_id           = module.network.subnet_id
+}
+```
+> 💡 *Este módulo simplifica la creación de una VM con su red asociada, seguridad y asignación de IP*.
+
+---
+
+### **Estructura Modular**
+
+#### **Módulo de Red (`modules/network`)**
+
+Este módulo crea una red virtual y una subred en Azure, gestionando todo lo relacionado con la configuración de la red.
+
+```hcl
+# Virtual Network
+resource "azurerm_virtual_network" "vnet" {
+  name                = var.vnet_name
+  address_space       = [var.vnet_address_space]
+  location            = var.location
+  resource_group_name = var.resource_group_name
+}
+
+# Subnet
+resource "azurerm_subnet" "subnet" {
   name                 = var.subnet_name
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [var.subnet_address_prefix]
 }
 ```
 
-> 💡 *Se crea una subnet dentro de la red virtual con un prefijo de direcciones IP específico*.
-
-![alt text](img/image-2.png)
-
 ---
 
-#### **5. IP Pública (🌍 azurerm_public_ip)**
+#### **Módulo de Máquina Virtual (`modules/vm`)**
 
-Se crea una IP pública estática para la máquina virtual, lo que permite el acceso externo.
+El módulo de VM incluye la creación de la máquina virtual, IP pública, interfaz de red, y las reglas de seguridad necesarias para su funcionamiento.
 
 ```hcl
-resource "azurerm_public_ip" "public_ip_first_vm" {
-  name              = var.public_ip_name
-  allocation_method = "Static"
+# Public IP
+resource "azurerm_public_ip" "public_ip" {
+  name                = var.public_ip_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  allocation_method   = "Static"
 }
-```
 
-> 💡 *Esta IP será utilizada para conectarse a la VM desde Internet*.
-
-![alt text](img/image-1.png)
-
----
-
-#### **6. Grupo de Seguridad de Red (🔐 azurerm_network_security_group)**
-
-Este recurso controla las reglas de seguridad para el tráfico hacia y desde la VM.
-
-```hcl
-resource "azurerm_network_security_group" "nsg_sebastian_first" {
-  name = var.nsg_name
-}
-```
-
-> 💡 *Define reglas para permitir el tráfico SSH y el acceso a Internet*.
-
-![alt text](img/image-3.png)
----
-
-#### **7. Interfaz de Red (📡 azurerm_network_interface)**
-
-Se conecta la VM a la red virtual y se le asigna la IP pública.
-
-```hcl
-resource "azurerm_network_interface" "nic_sebastian_first" {
-  name = var.nic_name
+# Network Interface
+resource "azurerm_network_interface" "nic" {
+  name                = var.nic_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
 
   ip_configuration {
-    subnet_id             = azurerm_subnet.subnet_vnet_sebastian.id
-    public_ip_address_id  = azurerm_public_ip.public_ip_first_vm.id
+    name                          = "my_ip_config"
+    subnet_id                     = var.subnet_id
+    public_ip_address_id          = azurerm_public_ip.public_ip.id
+    private_ip_address_allocation = "Dynamic"
   }
 }
-```
 
-> 💡 *Aquí conectamos la VM a la red y asociamos su IP pública*.
-
-![alt text](img/image-4.png)
-
----
-
-#### **8. Máquina Virtual (💻 azurerm_linux_virtual_machine)**
-
-Se despliega una máquina virtual con **Ubuntu** como sistema operativo.
-
-```hcl
-resource "azurerm_linux_virtual_machine" "vm_sebastian_first" {
+# Virtual Machine
+resource "azurerm_linux_virtual_machine" "vm" {
   name                = var.vm_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  size                = var.vm_size
   admin_username      = var.admin_username
   admin_password      = var.admin_password
 }
 ```
 
-> 💡 *La VM incluye Ubuntu 18.04, y se permite la autenticación con contraseña*.
-
-![alt text](img/image-5.png)
-
----
-
-#### **9. Asociación del Grupo de Seguridad (🔗 azurerm_network_interface_security_group_association)**
-
-Se asocia el grupo de seguridad con la interfaz de red.
-
-```hcl
-resource "azurerm_network_interface_security_group_association" "nic_nsg_association_sebastian_first" {
-  network_interface_id      = azurerm_network_interface.nic_sebastian_first.id
-  network_security_group_id = azurerm_network_security_group.nsg_sebastian_first.id
-}
-```
-
-> 💡 *Esto aplica las reglas de seguridad a la interfaz de red de la VM*.
+> 💡 *Este módulo organiza los recursos asociados a la VM, facilitando su mantenimiento y reutilización*.
 
 ---
 
 ### **Salidas (Outputs) 📤**
 
-Una vez desplegada la infraestructura, se muestran varias salidas importantes:
+Una vez desplegada la infraestructura, se muestran varias salidas importantes, incluidas la IP pública, el nombre de la red virtual y el ID de la VM.
 
-- **Public IP**: Muestra la dirección IP pública de la máquina virtual.
-- **VNet Name**: Nombre de la red virtual.
-- **Subnet Name**: Nombre de la subnet creada.
-- **VM ID**: Identificador único de la máquina virtual.
+```hcl
+# Output de la IP pública
+output "public_ip" {
+  description = "La IP pública de la máquina virtual"
+  value       = module.vm.public_ip
+}
+
+# Output de la Red Virtual
+output "vnet_name" {
+  description = "Nombre de la red virtual"
+  value       = module.network.vnet_name
+}
+```
+
+> 💡 *Los outputs muestran información clave del despliegue, permitiendo una verificación rápida de los recursos creados*.
 
 ---
 
@@ -179,14 +168,20 @@ Una vez desplegada la infraestructura, se muestran varias salidas importantes:
    terraform init
    terraform plan
    ```
+   ![alt text](image-2.png)
+   ![alt text](image-3.png)
+   
 3. **Aplicar el Despliegue**: Despliega la infraestructura con:
    ```bash
    terraform apply
    ```
+   ![alt text](image.png)
+   ![alt text](image-1.png)
+
 4. **Verificar las Salidas**: Una vez aplicado el despliegue, revisa las salidas generadas por Terraform.
 
 ---
 
 ### **Conclusión 🏁**
 
-El despliegue automatizado con Terraform facilita la creación y gestión de recursos en Azure de manera eficiente. Este enfoque asegura que los recursos se desplieguen de forma coherente y escalable. Gracias a las capturas de pantalla incluidas, el proceso es más visual y sencillo de seguir. ¡Terraform permite un control total sobre los recursos en la nube! 🚀
+La utilización de módulos en Terraform facilita la organización y reutilización de recursos, permitiendo una gestión más eficiente y escalable en Azure. El enfoque modular no solo organiza el código, sino que también simplifica futuras expansiones de la infraestructura. ¡Con Terraform y Azure, el despliegue es más ágil y escalable! 🚀
